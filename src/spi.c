@@ -11,9 +11,6 @@
 #include "spi.h"
 #include "stm32f4xx_spi.h"
 
-#include "ILI9225.h" //for the trials now only!!!
-
-#define CS						GPIO_Pin_4
 
 void spi_init(void)
 {
@@ -53,7 +50,7 @@ void spi_init(void)
     GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
     GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    GPIO_SetBits(GPIOA, CS);
+    GPIO_SetBits(CS_port, CS);
 
 	SPI_InitStruct.SPI_Direction = SPI_Direction_2Lines_FullDuplex; // set to full duplex mode, seperate MOSI and MISO lines
 	SPI_InitStruct.SPI_Mode = SPI_Mode_Master;     // transmit in master mode, NSS pin has to be always high
@@ -70,7 +67,7 @@ void spi_init(void)
 
 void spi_write(uint8_t address, uint8_t data)
 {
-	GPIO_ResetBits(GPIOA, CS);
+	GPIO_ResetBits(CS_port, CS);
 
 	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
 	SPI_I2S_SendData(SPI2, address);
@@ -82,88 +79,15 @@ void spi_write(uint8_t address, uint8_t data)
 	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
 	SPI_I2S_ReceiveData(SPI2);
 
-	GPIO_SetBits(GPIOA, CS);
+	GPIO_SetBits(CS_port, CS);
 }
 
-void spi_write16(uint16_t address, uint16_t data)
+void spi_write16(uint16_t data, int cs)
 {
 	uint8_t buffer = 0;
-
-
-	GPIO_WriteBit(GPIOA, CS, Bit_RESET);
-	GPIO_WriteBit(dispCtrlPort, RS, Bit_RESET);
-
-	//send higher byte of address
-	buffer= address >> 8;
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
-	SPI_I2S_SendData(SPI2, buffer);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
-	SPI_I2S_ReceiveData(SPI2);
-
-	//send lower byte of address
-	buffer= (uint8_t) (0x00ff & address);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
-	SPI_I2S_SendData(SPI2, buffer);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
-	SPI_I2S_ReceiveData(SPI2);
-
-
-	GPIO_WriteBit(dispCtrlPort, RS, Bit_SET);
-
-	//send higher byte of data
-	buffer= data >> 8;
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
-	SPI_I2S_SendData(SPI2, data);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
-	SPI_I2S_ReceiveData(SPI2);
-
-	//send lower byte of data
-	buffer= (uint8_t) (0x00ff & data);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
-	SPI_I2S_SendData(SPI2, data);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
-	SPI_I2S_ReceiveData(SPI2);
-
-
-	GPIO_WriteBit(GPIOA, CS, Bit_SET);
-
-
-}
-
-void spi_writeCommand(uint16_t address, int cs)
-{
-	uint8_t buffer = 0;
-
-	GPIO_WriteBit(dispCtrlPort, RS, Bit_RESET);
 	if(cs)
-		GPIO_WriteBit(GPIOA, CS, Bit_RESET);
+		GPIO_WriteBit(CS_port, CS, Bit_RESET);
 
-
-	//send higher byte of address
-	buffer= address >> 8;
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
-	SPI_I2S_SendData(SPI2, buffer);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
-	SPI_I2S_ReceiveData(SPI2);
-
-	//send lower byte of address
-	buffer= (uint8_t) (0x00ff & address);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
-	SPI_I2S_SendData(SPI2, buffer);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
-	SPI_I2S_ReceiveData(SPI2);
-
-	if(cs)
-		GPIO_WriteBit(GPIOA, CS, Bit_SET);
-}
-
-void spi_writeData(uint16_t data, int cs)
-{
-	uint8_t buffer = 0;
-
-	GPIO_WriteBit(dispCtrlPort, RS, Bit_SET);
-	if(cs)
-		GPIO_WriteBit(GPIOA, CS, Bit_RESET);
 
 	//send higher byte of data
 	buffer= data >> 8;
@@ -180,29 +104,16 @@ void spi_writeData(uint16_t data, int cs)
 	SPI_I2S_ReceiveData(SPI2);
 
 	if(cs)
-		GPIO_WriteBit(GPIOA, CS, Bit_SET);
-
+		GPIO_WriteBit(CS_port, CS, Bit_SET);
 }
 
-void spi_writeBuffer(uint16_t address, uint8_t * data, uint16_t length)
+void spi_writeBuffer(uint8_t * data, uint16_t length, int cs)
 {
 	int i=0;
 	uint8_t buffer = 0;
-	GPIO_ResetBits(GPIOC, GPIO_Pin_5);
 
-	//send higher byte of address
-	buffer= address >> 8;
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
-	SPI_I2S_SendData(SPI2, buffer);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
-	SPI_I2S_ReceiveData(SPI2);
-
-	//send lower byte of address
-	buffer= (uint8_t) (0x00ff & address);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
-	SPI_I2S_SendData(SPI2, buffer);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
-	SPI_I2S_ReceiveData(SPI2);
+	if(cs)
+		GPIO_ResetBits(CS_port, CS);
 
 	for (i=0; i<length; i++)
 	{
@@ -211,28 +122,16 @@ void spi_writeBuffer(uint16_t address, uint8_t * data, uint16_t length)
 		while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
 		SPI_I2S_ReceiveData(SPI2);
 	}
-}
-
-void spi_writeStart(uint8_t data, int cs)
-{
-	return;
-	if(cs)
-		GPIO_WriteBit(GPIOA, CS, Bit_RESET);
-
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
-	SPI_I2S_SendData(SPI2, data);
-	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
-	SPI_I2S_ReceiveData(SPI2);
 
 	if(cs)
-		GPIO_WriteBit(GPIOA, CS, Bit_SET);
+		GPIO_WriteBit(CS_port, CS, Bit_SET);
 }
 
 uint8_t spi_read(uint8_t address)
 {
 	address=0x80|address;
 
-	GPIO_ResetBits(GPIOC, GPIO_Pin_5);
+	GPIO_ResetBits(CS_port, CS);
 
 	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE));
 	SPI_I2S_SendData(SPI2, address);
@@ -243,7 +142,7 @@ uint8_t spi_read(uint8_t address)
 	SPI_I2S_SendData(SPI2, 0x00); //Dummy byte to generate clock
 	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
 
-	GPIO_SetBits(GPIOC, GPIO_Pin_5);
+	GPIO_SetBits(CS_port, CS);
 
 	return  SPI_I2S_ReceiveData(SPI2);
 }
@@ -283,18 +182,3 @@ void spi_writeBits(uint8_t address, uint8_t bitStart, uint8_t length, uint8_t da
         }
     //}
 }
-
-void spi_writeRegister(uint16_t address, uint16_t data)
-{
-	GPIO_WriteBit(GPIOA, CS, Bit_RESET);
-
-	GPIO_WriteBit(dispCtrlPort, RS, Bit_RESET);
-	spi_writeStart(START_INDEX_WRITE, 0);
-	spi_writeCommand(address, 0);
-
-	GPIO_WriteBit(dispCtrlPort, RS, Bit_SET);
-	spi_writeStart(START_REGISTER_WRITE, 0);
-	spi_writeData(data, 0);
-	GPIO_WriteBit(GPIOA, CS, Bit_SET);
-}
-

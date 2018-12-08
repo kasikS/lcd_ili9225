@@ -9,7 +9,8 @@
 #include "ILI9225.h"
 #include "spi.h"
 #include "delay.h"
-
+#include "ILI9225_registers.h"
+#include "ILI9225_colours.h"
 
 uint8_t  ILI9225_orientation = 0;
 uint8_t  ILI9225_maxX = 0;
@@ -45,6 +46,43 @@ void ILI9225_reset(void)
 	Delay(50);
 }
 
+void ILI9225_writeIndex(uint16_t address, int cs)
+{
+	if(cs)
+		GPIO_WriteBit(CS_port, CS, Bit_RESET);
+
+	GPIO_WriteBit(dispCtrlPort, RS, Bit_RESET);
+
+	spi_write16(address, 0);
+
+	if(cs)
+		GPIO_WriteBit(CS_port, CS, Bit_SET);
+}
+
+void ILI9225_writeRegister(uint16_t data, int cs)
+{
+	if(cs)
+		GPIO_WriteBit(CS_port, CS, Bit_RESET);
+
+	GPIO_WriteBit(dispCtrlPort, RS, Bit_SET);
+
+	spi_write16(data, 0);
+
+	if(cs)
+		GPIO_WriteBit(CS_port, CS, Bit_SET);
+}
+
+
+void ILI9225_write(uint16_t address, uint16_t data)
+{
+	GPIO_WriteBit(CS_port, CS, Bit_RESET);
+
+	ILI9225_writeIndex(address, 0);
+	ILI9225_writeRegister(data, 0);
+
+	GPIO_WriteBit(CS_port, CS, Bit_SET);
+}
+
 
 void ILI9225_setOrientation(uint8_t orientation)
 {
@@ -74,73 +112,76 @@ void ILI9225_setOrientation(uint8_t orientation)
 
 void ILI9225_init(void)
 {
+	ILI9225_initCtrlGPIO();
+	Delay(50);
+	ILI9225_reset();
 
 /* Start Initial Sequence */
    /* Set SS bit and direction output from S528 to S1 */
-	spi_writeRegister(POWER_CTRL1, 0x0000); // Set SAP,DSTB,STB
-	spi_writeRegister(POWER_CTRL2, 0x0000); // Set APON,PON,AON,VCI1EN,VC
-	spi_writeRegister(POWER_CTRL3, 0x0000); // Set BT,DC1,DC2,DC3
-	spi_writeRegister(POWER_CTRL4, 0x0000); // Set GVDD
-	spi_writeRegister(POWER_CTRL5, 0x0000); // Set VCOMH/VCOML voltage
+	ILI9225_write(POWER_CTRL1, 0x0000); // Set SAP,DSTB,STB
+	ILI9225_write(POWER_CTRL2, 0x0000); // Set APON,PON,AON,VCI1EN,VC
+	ILI9225_write(POWER_CTRL3, 0x0000); // Set BT,DC1,DC2,DC3
+	ILI9225_write(POWER_CTRL4, 0x0000); // Set GVDD
+	ILI9225_write(POWER_CTRL5, 0x0000); // Set VCOMH/VCOML voltage
 	Delay(40);
 
    // Power-on sequence
-	spi_writeRegister(POWER_CTRL2, 0x0018); // Set APON,PON,AON,VCI1EN,VC
-	spi_writeRegister(POWER_CTRL3, 0x6121); // Set BT,DC1,DC2,DC3
-	spi_writeRegister(POWER_CTRL4, 0x006F); // Set GVDD   /*007F 0088 */
-	spi_writeRegister(POWER_CTRL5, 0x495F); // Set VCOMH/VCOML voltage
-	spi_writeRegister(POWER_CTRL1, 0x0800); // Set SAP,DSTB,STB
-   Delay(10);
-   spi_writeRegister(POWER_CTRL2, 0x103B); // Set APON,PON,AON,VCI1EN,VC
-   Delay(50);
+	ILI9225_write(POWER_CTRL2, 0x0018); // Set APON,PON,AON,VCI1EN,VC
+	ILI9225_write(POWER_CTRL3, 0x6121); // Set BT,DC1,DC2,DC3
+	ILI9225_write(POWER_CTRL4, 0x006F); // Set GVDD   /*007F 0088 */
+	ILI9225_write(POWER_CTRL5, 0x495F); // Set VCOMH/VCOML voltage
+	ILI9225_write(POWER_CTRL1, 0x0800); // Set SAP,DSTB,STB
+	Delay(10);
+	ILI9225_write(POWER_CTRL2, 0x103B); // Set APON,PON,AON,VCI1EN,VC
+	Delay(50);
 
-   spi_writeRegister(DRIVER_OUTPUT_CTRL, 0x011C); // set the display line number and display direction
-   spi_writeRegister(LCD_AC_DRIVING_CTRL, 0x0100); // set 1 line inversion
-   spi_writeRegister(ENTRY_MODE, 0x1030); // set GRAM write direction and BGR=1. //0x1030
-   spi_writeRegister(DISP_CTRL1, 0x0000); // Display off
-   spi_writeRegister(BLANK_PERIOD_CTRL1, 0x0808); // set the back porch and front porch
-   spi_writeRegister(FRAME_CYCLE_CTRL, 0x1100); // set the clocks number per line
-   spi_writeRegister(INTERFACE_CTRL, 0x0000); // CPU interface
-   spi_writeRegister(OSC_CTRL, 0x0D01); // Set Osc  /*0e01*/
-   spi_writeRegister(VCI_RECYCLING, 0x0020); // Set VCI recycling
-   spi_writeRegister(RAM_ADDR_SET1, 0x0000); // RAM Address
-   spi_writeRegister(RAM_ADDR_SET2, 0x0000); // RAM Address
+	ILI9225_write(DRIVER_OUTPUT_CTRL, 0x011C); // set the display line number and display direction
+	ILI9225_write(LCD_AC_DRIVING_CTRL, 0x0100); // set 1 line inversion
+	ILI9225_write(ENTRY_MODE, 0x1030); // set GRAM write direction and BGR=1. //0x1030
+	ILI9225_write(DISP_CTRL1, 0x0000); // Display off
+	ILI9225_write(BLANK_PERIOD_CTRL1, 0x0808); // set the back porch and front porch
+	ILI9225_write(FRAME_CYCLE_CTRL, 0x1100); // set the clocks number per line
+	ILI9225_write(INTERFACE_CTRL, 0x0000); // CPU interface
+	ILI9225_write(OSC_CTRL, 0x0D01); // Set Osc  /*0e01*/
+	ILI9225_write(VCI_RECYCLING, 0x0020); // Set VCI recycling
+	ILI9225_write(RAM_ADDR_SET1, 0x0000); // RAM Address
+	ILI9225_write(RAM_ADDR_SET2, 0x0000); // RAM Address
 
-                                                  /* Set GRAM area */
-   spi_writeRegister(GATE_SCAN_CTRL, 0x0000);
-   spi_writeRegister(VERTICAL_SCROLL_CTRL1, 0x00DB);
-   spi_writeRegister(VERTICAL_SCROLL_CTRL2, 0x0000);
-   spi_writeRegister(VERTICAL_SCROLL_CTRL3, 0x0000);
-   spi_writeRegister(PARTIAL_DRIVING_POS1, 0x00DB);
-   spi_writeRegister(PARTIAL_DRIVING_POS2, 0x0000);
-   spi_writeRegister(HORIZONTAL_WINDOW_ADDR1, 0x00AF);
-   spi_writeRegister(HORIZONTAL_WINDOW_ADDR2, 0x0000);
-   spi_writeRegister(VERTICAL_WINDOW_ADDR1, 0x00DB);
-   spi_writeRegister(VERTICAL_WINDOW_ADDR2, 0x0000);
+/* Set GRAM area */
+	ILI9225_write(GATE_SCAN_CTRL, 0x0000);
+	ILI9225_write(VERTICAL_SCROLL_CTRL1, 0x00DB);
+	ILI9225_write(VERTICAL_SCROLL_CTRL2, 0x0000);
+	ILI9225_write(VERTICAL_SCROLL_CTRL3, 0x0000);
+	ILI9225_write(PARTIAL_DRIVING_POS1, 0x00DB);
+	ILI9225_write(PARTIAL_DRIVING_POS2, 0x0000);
+	ILI9225_write(HORIZONTAL_WINDOW_ADDR1, 0x00AF);
+	ILI9225_write(HORIZONTAL_WINDOW_ADDR2, 0x0000);
+	ILI9225_write(VERTICAL_WINDOW_ADDR1, 0x00DB);
+	ILI9225_write(VERTICAL_WINDOW_ADDR2, 0x0000);
 
-   /* Set GAMMA curve */
-   spi_writeRegister(GAMMA_CTRL1, 0x0000);
-   spi_writeRegister(GAMMA_CTRL2, 0x0808);
-   spi_writeRegister(GAMMA_CTRL3, 0x080A);
-   spi_writeRegister(GAMMA_CTRL4, 0x000A);
-   spi_writeRegister(GAMMA_CTRL5, 0x0A08);
-   spi_writeRegister(GAMMA_CTRL6, 0x0808);
-   spi_writeRegister(GAMMA_CTRL7, 0x0000);
-   spi_writeRegister(GAMMA_CTRL8, 0x0A00);
-   spi_writeRegister(GAMMA_CTRL9, 0x0710);
-   spi_writeRegister(GAMMA_CTRL10, 0x0710);
+/* Set GAMMA curve */
+	ILI9225_write(GAMMA_CTRL1, 0x0000);
+	ILI9225_write(GAMMA_CTRL2, 0x0808);
+	ILI9225_write(GAMMA_CTRL3, 0x080A);
+	ILI9225_write(GAMMA_CTRL4, 0x000A);
+	ILI9225_write(GAMMA_CTRL5, 0x0A08);
+	ILI9225_write(GAMMA_CTRL6, 0x0808);
+	ILI9225_write(GAMMA_CTRL7, 0x0000);
+	ILI9225_write(GAMMA_CTRL8, 0x0A00);
+	ILI9225_write(GAMMA_CTRL9, 0x0710);
+	ILI9225_write(GAMMA_CTRL10, 0x0710);
 
-   spi_writeRegister(DISP_CTRL1, 0x0012);
-   Delay(50);
-   spi_writeRegister(DISP_CTRL1, 0x1017);
+	ILI9225_write(DISP_CTRL1, 0x0012);
+	Delay(50);
+	ILI9225_write(DISP_CTRL1, 0x1017);
 
 
-   ILI9225_setOrientation(0);
+	ILI9225_setOrientation(0);
 
-   // Initialize variables
-   //setBackgroundColor(COLOR_BLACK);
+	// Initialize variables
+	//setBackgroundColor(COLOR_BLACK);
 
-   //clear();
+	ILI9225_clear();
 }
 
 void ILI9225_swap(uint16_t *a, uint16_t *b)
@@ -179,31 +220,54 @@ void ILI9225_setWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
     if (x1 < x0) ILI9225_swap(&x0, &x1);
     if (y1 < y0) ILI9225_swap(&y0, &y1);
 
-    spi_writeRegister(HORIZONTAL_WINDOW_ADDR1, x1);
-    spi_writeRegister(HORIZONTAL_WINDOW_ADDR2, x0);
+    ILI9225_write(HORIZONTAL_WINDOW_ADDR1, x1);
+    ILI9225_write(HORIZONTAL_WINDOW_ADDR2, x0);
 
-    spi_writeRegister(VERTICAL_WINDOW_ADDR1, y1);
-    spi_writeRegister(VERTICAL_WINDOW_ADDR2, y0);
+    ILI9225_write(VERTICAL_WINDOW_ADDR1, y1);
+    ILI9225_write(VERTICAL_WINDOW_ADDR2, y0);
 
-    spi_writeRegister(RAM_ADDR_SET1, x0);
-    spi_writeRegister(RAM_ADDR_SET2, y0);
+    ILI9225_write(RAM_ADDR_SET1, x0);
+    ILI9225_write(RAM_ADDR_SET2, y0);
 
-    spi_writeCommand(0x0022, 1);
+    ILI9225_writeIndex(0x0022, 1);
 }
 
 
 void ILI9225_drawPixel(uint16_t x1, uint16_t y1, uint16_t color)
 {
-
     if ((x1 >= ILI9225_maxX) || (y1 >= ILI9225_maxY)) return;
 
-    //ILI9225_setWindow(x1, y1, x1 + 1, y1 + 1);
     ILI9225_orientCoordinates(&x1, &y1);
-   // spi_writeData(color);
-
-    spi_writeRegister(RAM_ADDR_SET1,x1);
-	spi_writeRegister(RAM_ADDR_SET2,y1);
-    spi_writeRegister(GRAM_DATA_REG,color);
-
+    ILI9225_write(RAM_ADDR_SET1,x1);
+    ILI9225_write(RAM_ADDR_SET2,y1);
+    ILI9225_write(GRAM_DATA_REG,color);
 }
 
+void ILI9225_drawBitmap(uint16_t x0, uint16_t y0, uint16_t columns, uint16_t rows, uint16_t *data)
+{
+	int i = 0;
+	uint16_t size = rows*columns;
+    if ((x0 >= ILI9225_maxX) || (y0 >= ILI9225_maxY) || (x0+columns-1 >= ILI9225_maxX) || (y0+rows-1 >= ILI9225_maxY)   ) return;
+
+    ILI9225_setWindow(x0, y0, x0 + columns-1, y0 + rows-1);
+    ILI9225_orientCoordinates(&x0, &y0);
+
+    for(i=0; i< size; i++)
+    {
+    	ILI9225_write(GRAM_DATA_REG,data[i]);
+    }
+}
+
+void ILI9225_clear(void)
+{
+	uint16_t size = LCD_WIDTH*LCD_HEIGHT;
+	int i = 0;
+	uint16_t buff[size];
+
+	for (i = 0; i < size; i++)
+	{
+		buff[i] = COLOR_SNOW;
+	}
+
+	ILI9225_drawBitmap(0,0,LCD_WIDTH,LCD_HEIGHT, buff);
+}
