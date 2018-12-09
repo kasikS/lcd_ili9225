@@ -30,17 +30,8 @@
 #include "ILI9225.h"
 #include "ILI9225_colours.h"
 #include "spi.h"
-
-/*#define controlPort		GPIOC
-#define addressPort		GPIOA
-#define dataPort		GPIOB
-#define MERQ			GPIO_Pin_0
-#define CS				GPIO_Pin_1
-#define RD				GPIO_Pin_2
-#define WR 				GPIO_Pin_3
-*/
-
-
+#include "serial.h"
+#include "ILI9225_registers.h"
 
 
 /**
@@ -49,11 +40,16 @@
   * @retval None
   */
 
+
+
+
 int main(void) {
 
 
 	DelayInit();
 	spi_init(); //init spi2
+
+	serial_init(460800);
 	ILI9225_init();
 	Delay(10);
 
@@ -61,49 +57,32 @@ int main(void) {
 	uint16_t y1 = 0;
 	int  i = 0;
 
-	uint16_t green[200];
-	uint16_t red[200];
-	uint16_t mixed[400];
-
+	uint16_t bitmap[400];
 for (i = 0; i<200; i ++)
 {
-	green[i] = COLOR_GREEN;
-	red[i] = COLOR_RED;
-}
-
-for (i = 0; i<200; i ++)
-{
-	mixed[i] = COLOR_VIOLET;
+	bitmap[i] = COLOR_VIOLET;
 }
 
 for (i = 200; i<400; i ++)
 {
-	mixed[i] = COLOR_GOLD;
+	bitmap[i] = COLOR_GREENYELLOW;
 }
 
 
-//	for (y1 = 0; y1 < 50; y1++)
-//	{
-//		for (x1 = 0; x1 < 50; x1++)
-//		{
-//			ILI9225_drawPixel(x1, y1, COLOR_GREEN);
-//		}
-//	}
+ILI9225_setWindow(x1, y1, 100, 4);
+GPIO_ResetBits(CS_port, CS);
+ILI9225_writeIndex(GRAM_DATA_REG,0);
+GPIO_WriteBit(GPIOA, GPIO_Pin_7, Bit_SET);
+spi_DMA_Init(bitmap,800);
+spi_DMA_Transfer();
 
-
-	ILI9225_drawBitmap(x1, y1, 100, 2, red);
-
-
-	y1 = 5;
-
-	ILI9225_drawBitmap(x1, y1, 100, 4, mixed);
-
-
+//	ILI9225_drawBitmap(x1, y1, 100, 4, bitmap);
 
 //	spi_write16(DISP_CTRL1, 0x0000); // Display off
 
 	while (1)
 	{
+		Delay(1000);
 	}
 }
 

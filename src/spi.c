@@ -10,6 +10,7 @@
 #include "stm32f4xx_conf.h"
 #include "spi.h"
 #include "stm32f4xx_spi.h"
+#include "serial.h"
 
 
 void spi_init(void)
@@ -63,6 +64,53 @@ void spi_init(void)
 	SPI_Init(SPI2, &SPI_InitStruct);
 
 	SPI_Cmd(SPI2, ENABLE); // enable SPI2
+}
+
+void spi_DMA_Init(uint16_t *data, uint32_t bufferSize)
+{
+	NVIC_InitTypeDef NVIC_InitStructure;
+	DMA_InitTypeDef  DMA_InitStructure;
+
+	//DMA_Cmd(DMA1_Stream1, DISABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA1, ENABLE);
+
+	DMA_ClearFlag(DMA1_Stream4, DMA_FLAG_FEIF4 | DMA_FLAG_DMEIF4 | DMA_FLAG_TEIF4 | DMA_FLAG_HTIF4 | DMA_FLAG_TCIF4);
+
+	DMA_DeInit(DMA1_Stream4); //reset DMA1 channe1 to default values;
+
+	DMA_InitStructure.DMA_Channel = DMA_Channel_0;
+	DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;	//Location assigned to peripheral register will be source
+	DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)data; //variable to write data from
+
+	DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)(&(SPI2->DR)); // : address of data reading register -not needed
+//	DMA_InitStructure.DMA_M2M = DMA_M2M_Disable; //channel will be used for peripheral to memory transfer
+	DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;	//setting normal mode (non circular)
+	DMA_InitStructure.DMA_Priority = DMA_Priority_VeryHigh;	//medium priority
+	DMA_InitStructure.DMA_BufferSize = bufferSize;	//number of data to be transfered
+	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable; //automatic memory increment disable for peripheral
+	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;	//automatic memory increment enable for memory
+	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;	//source peripheral data size = 8bit
+	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;	//destination memory data size = 8bit
+	DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
+	DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
+	DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
+	DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+	DMA_Init(DMA1_Stream4, &DMA_InitStructure);
+	DMA_ITConfig(DMA1_Stream4, DMA_IT_TC, ENABLE);
+
+	NVIC_InitStructure.NVIC_IRQChannel = DMA1_Stream4_IRQn; //I2C1 connect to channel 4 of DMA1
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 5;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+}
+
+void spi_DMA_Transfer(void)
+{
+	DMA_Cmd(DMA1_Stream4, ENABLE); /* Enable the DMA SPI TX Stream */
+	SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);
+	SPI_Cmd(SPI2, ENABLE);
 }
 
 void spi_write(uint8_t address, uint8_t data)
@@ -181,4 +229,27 @@ void spi_writeBits(uint8_t address, uint8_t bitStart, uint8_t length, uint8_t da
             spi_write(address, b);
         }
     //}
+}
+
+void DMA1_Stream4_IRQHandler(void)
+{
+	serial_puts("aaaaa");
+
+if (DMA_GetFlagStatus(DMA1_Stream4, DMA_FLAG_TCIF4))
+	{
+
+		DMA_ClearITPendingBit(DMA1_Stream4, DMA_IT_TCIF4);
+//		/* Clear transmission complete flag */
+		DMA_ClearFlag(DMA1_Stream4, DMA_FLAG_TCIF4);
+//
+		if(stopDMA)
+		{
+			SPI_I2S_DMACmd(SPI2,SPI_I2S_DMAReq_Tx, DISABLE);
+	//		/* Send CS STOP Condition */
+			GPIO_WriteBit(CS_port, CS, Bit_SET);
+
+	//		/* Disable DMA channel*/
+			DMA_Cmd(DMA1_Stream4, DISABLE);
+		}
+	}
 }

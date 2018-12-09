@@ -24,5 +24,9 @@ void spi_writeBuffer(uint8_t * data, uint16_t length, int cs);
 void spi_writeCommand(uint16_t address, int cs);
 void spi_writeData(uint16_t data, int cs);
 void spi_writeRegister(uint16_t address, uint16_t data);
+void spi_DMA_Init(uint16_t *data, uint32_t bufferSize);
+void spi_DMA_Transfer(void);
 
+extern int stopDMA;
+//extern uint16_t bitmap[400];
 #endif /* SRC_SPI_H */

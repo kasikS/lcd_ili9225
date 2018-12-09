@@ -249,14 +249,43 @@ void ILI9225_drawBitmap(uint16_t x0, uint16_t y0, uint16_t columns, uint16_t row
 	uint16_t size = rows*columns;
     if ((x0 >= ILI9225_maxX) || (y0 >= ILI9225_maxY) || (x0+columns-1 >= ILI9225_maxX) || (y0+rows-1 >= ILI9225_maxY)   ) return;
 
-    ILI9225_setWindow(x0, y0, x0 + columns-1, y0 + rows-1);
     ILI9225_orientCoordinates(&x0, &y0);
+    ILI9225_setWindow(x0, y0, x0 + columns-1, y0 + rows-1);
+
+    ILI9225_writeIndex(GRAM_DATA_REG,1);
 
     for(i=0; i< size; i++)
     {
-    	ILI9225_write(GRAM_DATA_REG,data[i]);
+//    	ILI9225_write(GRAM_DATA_REG,data[i]);
+    	ILI9225_writeRegister(data[i],1);
+
     }
 }
+
+int stopDMA;
+
+void ILI9225_startdBitmapDMA(uint16_t *data)
+{
+	int i = 0;
+	uint16_t size = LCD_WIDTH*LCD_HEIGHT;
+
+	spi_DMA_Init(data, size);
+	ILI9225_setWindow(0, 0, LCD_WIDTH-1, LCD_HEIGHT-1); //set full screen window
+
+	GPIO_WriteBit(dispCtrlPort, RS, Bit_SET);
+	ILI9225_writeIndex(GRAM_DATA_REG,0);				//write gram reg address
+
+	spi_DMA_Transfer();
+
+	stopDMA = 0;
+}
+
+
+void ILI9225_stopdBitmapDMA(void)
+{
+	stopDMA = 1;
+}
+
 
 void ILI9225_clear(void)
 {

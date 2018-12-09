@@ -1,5 +1,5 @@
 /*
- * ILI9225_registers.c
+ * ILI9225_registers.h
  *
  *  Created on: Dec 8, 2018
  *      Author: kasik
