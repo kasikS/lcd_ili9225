@@ -9,7 +9,11 @@
 #define SRC_ILI9225_COLOURS_H_
 
 /* RGB 24-bits color table definition (RGB888). */
-#define RGB888_RGB565(color) ((((color) >> 19) & 0x1f) << 11) | ((((color) >> 10) & 0x3f) << 5) | (((color) >> 3) & 0x1f)
+//#define RGB888_RGB565(color) ((((color) >> 19) & 0x1f) << 11) | ((((color) >> 10) & 0x3f) << 5) | (((color) >> 3) & 0x1f)
+
+
+#define RGB888_RGB565a(color) ((((color) >> 19) & 0x1f) << 11) | ((((color) >> 10) & 0x3f) << 5) | (((color) >> 3) & 0x1f)
+#define RGB888_RGB565(color) ((RGB888_RGB565a(color) & 0xff) << 8) | ((RGB888_RGB565a(color) & 0xff00) >> 8)
 
 #define COLOR_BLACK          RGB888_RGB565(0x000000u)
 #define COLOR_WHITE          RGB888_RGB565(0xFFFFFFu)

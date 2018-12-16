@@ -41,10 +41,12 @@
   */
 
 
+volatile uint16_t bitmap[176*110];
+volatile int displayFree;
 
-
-int main(void) {
-
+int main(void)
+{
+uint16_t coloursArr[8] = {COLOR_BLACK, COLOR_RED, COLOR_PINK, COLOR_INDIGO, COLOR_WHITE, COLOR_GOLD, COLOR_DARKGRAY, COLOR_TURQUOISE};
 
 	DelayInit();
 	spi_init(); //init spi2
@@ -57,31 +59,60 @@ int main(void) {
 	uint16_t y1 = 0;
 	int  i = 0;
 
-	uint16_t bitmap[400];
-for (i = 0; i<200; i ++)
-{
-	bitmap[i] = COLOR_VIOLET;
-}
-
-for (i = 200; i<400; i ++)
-{
-	bitmap[i] = COLOR_GREENYELLOW;
-}
-
-
-ILI9225_setWindow(x1, y1, 100, 4);
-GPIO_ResetBits(CS_port, CS);
-ILI9225_writeIndex(GRAM_DATA_REG,0);
-GPIO_WriteBit(GPIOA, GPIO_Pin_7, Bit_SET);
-spi_DMA_Init(bitmap,800);
-spi_DMA_Transfer();
-
-//	ILI9225_drawBitmap(x1, y1, 100, 4, bitmap);
-
 //	spi_write16(DISP_CTRL1, 0x0000); // Display off
+
+	int counter=0;
+	int half=0;
+	ILI9225_clear();
 
 	while (1)
 	{
+		if(displayFree)
+		{
+			for (i = 0; i<176*55; i ++)
+			{
+				bitmap[i] = coloursArr[counter%4];
+			}
+
+			for (i = 176*55; i<176 * 110; i ++)
+			{
+				bitmap[i] = coloursArr[counter%4 + 4];
+			}
+
+
+			ILI9225_setWindow(x1, y1, 175, 109);
+			ILI9225_initBitmapDMA(bitmap, 176,110);
+			ILI9225_startBitmapDMA();
+
+			counter++;
+
+//			if(half)
+//			{
+//				x1 = 0;
+//				y1 = 109;
+//				ILI9225_setWindow(x1, y1, 175, 110);
+//				ILI9225_initBitmapDMA(bitmap+(176*110), 176,110);
+//				ILI9225_startBitmapDMA();
+//
+//				half = 0;
+//				counter++;
+//			}
+//			else
+//			{
+//				x1 = 0;
+//				y1 = 0;
+//				ILI9225_setWindow(x1, y1, 175, 110);
+//				ILI9225_initBitmapDMA(bitmap, 176,110);
+//				ILI9225_startBitmapDMA();
+//
+//				half = 1;
+//			}
+
+
+//			ILI9225_drawBitmap(x1, y1, 176, 100, bitmap);
+
+		}
+
 		Delay(1000);
 	}
 }

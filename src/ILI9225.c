@@ -39,9 +39,9 @@ void ILI9225_initCtrlGPIO(void)
 void ILI9225_reset(void)
 {
 	GPIO_WriteBit(dispCtrlPort, RESET, Bit_SET);
-	Delay(1);
-	GPIO_WriteBit(dispCtrlPort, RESET, Bit_RESET);
 	Delay(10);
+	GPIO_WriteBit(dispCtrlPort, RESET, Bit_RESET);
+	Delay(50);
 	GPIO_WriteBit(dispCtrlPort, RESET, Bit_SET);
 	Delay(50);
 }
@@ -178,9 +178,6 @@ void ILI9225_init(void)
 
 	ILI9225_setOrientation(0);
 
-	// Initialize variables
-	//setBackgroundColor(COLOR_BLACK);
-
 	ILI9225_clear();
 }
 
@@ -228,8 +225,6 @@ void ILI9225_setWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 
     ILI9225_write(RAM_ADDR_SET1, x0);
     ILI9225_write(RAM_ADDR_SET2, y0);
-
-    ILI9225_writeIndex(0x0022, 1);
 }
 
 
@@ -253,37 +248,41 @@ void ILI9225_drawBitmap(uint16_t x0, uint16_t y0, uint16_t columns, uint16_t row
     ILI9225_setWindow(x0, y0, x0 + columns-1, y0 + rows-1);
 
     ILI9225_writeIndex(GRAM_DATA_REG,1);
+	GPIO_WriteBit(CS_port, CS, Bit_RESET);
 
     for(i=0; i< size; i++)
     {
-//    	ILI9225_write(GRAM_DATA_REG,data[i]);
-    	ILI9225_writeRegister(data[i],1);
+    	ILI9225_writeRegister(data[i],0);
 
     }
+	GPIO_WriteBit(CS_port, CS, Bit_SET);
 }
 
-int stopDMA;
 
-void ILI9225_startdBitmapDMA(uint16_t *data)
+void ILI9225_initBitmapDMA(uint16_t *data, uint16_t columns, uint16_t rows)
 {
-	int i = 0;
-	uint16_t size = LCD_WIDTH*LCD_HEIGHT;
+	uint16_t size =rows*columns*2;
+	ILI9225_setWindow(0, 0, columns-1, rows-1);
 
 	spi_DMA_Init(data, size);
-	ILI9225_setWindow(0, 0, LCD_WIDTH-1, LCD_HEIGHT-1); //set full screen window
-
-	GPIO_WriteBit(dispCtrlPort, RS, Bit_SET);
-	ILI9225_writeIndex(GRAM_DATA_REG,0);				//write gram reg address
-
-	spi_DMA_Transfer();
-
-	stopDMA = 0;
+	spi_DMA_irqInit();
+	spi_DMA_irqEnable();
 }
 
-
-void ILI9225_stopdBitmapDMA(void)
+void ILI9225_reconfBitmapDMA(uint16_t *data, uint16_t columns, uint16_t rows)
 {
-	stopDMA = 1;
+	uint16_t size = rows*columns*2;
+	ILI9225_setWindow(0, 0, columns-1, rows-1);
+	spi_DMA_Init(data, size);
+}
+
+void ILI9225_startBitmapDMA(void)
+{
+	ILI9225_writeIndex(GRAM_DATA_REG,1);				//write gram reg address
+
+	GPIO_WriteBit(dispCtrlPort, RS, Bit_SET);
+
+	spi_DMA_Enable();
 }
 
 

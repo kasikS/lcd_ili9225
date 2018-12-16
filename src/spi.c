@@ -71,7 +71,9 @@ void spi_DMA_Init(uint16_t *data, uint32_t bufferSize)
 	NVIC_InitTypeDef NVIC_InitStructure;
 	DMA_InitTypeDef  DMA_InitStructure;
 
-	//DMA_Cmd(DMA1_Stream1, DISABLE);
+	DMA_Cmd(DMA1_Stream4, DISABLE);
+	while(DMA_GetCmdStatus(DMA1_Stream4)); //
+
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA1, ENABLE);
 
 	DMA_ClearFlag(DMA1_Stream4, DMA_FLAG_FEIF4 | DMA_FLAG_DMEIF4 | DMA_FLAG_TEIF4 | DMA_FLAG_HTIF4 | DMA_FLAG_TCIF4);
@@ -80,10 +82,9 @@ void spi_DMA_Init(uint16_t *data, uint32_t bufferSize)
 
 	DMA_InitStructure.DMA_Channel = DMA_Channel_0;
 	DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;	//Location assigned to peripheral register will be source
-	DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)data; //variable to write data from
+	DMA_InitStructure.DMA_Memory0BaseAddr = (int32_t)data; //variable to write data from
 
 	DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)(&(SPI2->DR)); // : address of data reading register -not needed
-//	DMA_InitStructure.DMA_M2M = DMA_M2M_Disable; //channel will be used for peripheral to memory transfer
 	DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;	//setting normal mode (non circular)
 	DMA_InitStructure.DMA_Priority = DMA_Priority_VeryHigh;	//medium priority
 	DMA_InitStructure.DMA_BufferSize = bufferSize;	//number of data to be transfered
@@ -96,21 +97,52 @@ void spi_DMA_Init(uint16_t *data, uint32_t bufferSize)
 	DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
 	DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
 	DMA_Init(DMA1_Stream4, &DMA_InitStructure);
-	DMA_ITConfig(DMA1_Stream4, DMA_IT_TC, ENABLE);
+}
 
-	NVIC_InitStructure.NVIC_IRQChannel = DMA1_Stream4_IRQn; //I2C1 connect to channel 4 of DMA1
+void spi_DMA_irqInit(void)
+{
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	NVIC_InitStructure.NVIC_IRQChannel = DMA1_Stream4_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 5;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
+}
+
+void spi_DMA_irqEnable(void)
+{
+	DMA_ITConfig(DMA1_Stream4, DMA_IT_TC, ENABLE);
+}
+
+void spi_DMA_irqDisable(void)
+{
+	DMA_ITConfig(DMA1_Stream4, DMA_IT_TC, DISABLE);
+}
+
+void spi_DMA_Enable(void)
+{
+	displayFree=0;
+	GPIO_WriteBit(CS_port, CS, Bit_RESET);
+
+	SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);
+
+	DMA_Cmd(DMA1_Stream4, ENABLE); /* Enable the DMA SPI TX Stream */
+
+	SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);
 
 }
 
-void spi_DMA_Transfer(void)
+void spi_DMA_Disable(void)
 {
-	DMA_Cmd(DMA1_Stream4, ENABLE); /* Enable the DMA SPI TX Stream */
-	SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);
-	SPI_Cmd(SPI2, ENABLE);
+
+//	DMA_Cmd(DMA1_Stream4, DISABLE);
+//	while(DMA_GetCmdStatus(DMA1_Stream4));
+//	SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, DISABLE);
+
+	GPIO_WriteBit(CS_port, CS, Bit_SET);
+
+	displayFree=1;
 }
 
 void spi_write(uint8_t address, uint8_t data)
@@ -126,6 +158,7 @@ void spi_write(uint8_t address, uint8_t data)
 	SPI_I2S_SendData(SPI2, data);
 	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
 	SPI_I2S_ReceiveData(SPI2);
+	while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY));
 
 	GPIO_SetBits(CS_port, CS);
 }
@@ -150,6 +183,7 @@ void spi_write16(uint16_t data, int cs)
 	SPI_I2S_SendData(SPI2, buffer);
 	while(!SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE));
 	SPI_I2S_ReceiveData(SPI2);
+	while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY));
 
 	if(cs)
 		GPIO_WriteBit(CS_port, CS, Bit_SET);
@@ -233,23 +267,14 @@ void spi_writeBits(uint8_t address, uint8_t bitStart, uint8_t length, uint8_t da
 
 void DMA1_Stream4_IRQHandler(void)
 {
-	serial_puts("aaaaa");
-
-if (DMA_GetFlagStatus(DMA1_Stream4, DMA_FLAG_TCIF4))
-	{
+		while(!DMA_GetFlagStatus(DMA1_Stream4, DMA_FLAG_TCIF4))
 
 		DMA_ClearITPendingBit(DMA1_Stream4, DMA_IT_TCIF4);
-//		/* Clear transmission complete flag */
+		/* Clear transmission complete flag */
 		DMA_ClearFlag(DMA1_Stream4, DMA_FLAG_TCIF4);
-//
-		if(stopDMA)
-		{
-			SPI_I2S_DMACmd(SPI2,SPI_I2S_DMAReq_Tx, DISABLE);
-	//		/* Send CS STOP Condition */
-			GPIO_WriteBit(CS_port, CS, Bit_SET);
 
-	//		/* Disable DMA channel*/
-			DMA_Cmd(DMA1_Stream4, DISABLE);
-		}
-	}
+		while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET);
+		while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
+
+		spi_DMA_Disable();
 }

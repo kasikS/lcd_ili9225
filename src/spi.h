@@ -25,8 +25,10 @@ void spi_writeCommand(uint16_t address, int cs);
 void spi_writeData(uint16_t data, int cs);
 void spi_writeRegister(uint16_t address, uint16_t data);
 void spi_DMA_Init(uint16_t *data, uint32_t bufferSize);
-void spi_DMA_Transfer(void);
+void spi_DMA_Enable(void);
+
 
 extern int stopDMA;
+extern volatile int displayFree;
 //extern uint16_t bitmap[400];
 #endif /* SRC_SPI_H */
