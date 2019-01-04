@@ -32,6 +32,7 @@
 #include "spi.h"
 #include "serial.h"
 #include "ILI9225_registers.h"
+#include "unicorn.h"
 
 
 /**
@@ -41,8 +42,8 @@
   */
 
 
-volatile uint16_t bitmap[176*110];
-volatile int displayFree;
+//volatile uint16_t bitmap[176*220];
+
 
 int main(void)
 {
@@ -62,57 +63,33 @@ uint16_t coloursArr[8] = {COLOR_BLACK, COLOR_RED, COLOR_PINK, COLOR_INDIGO, COLO
 //	spi_write16(DISP_CTRL1, 0x0000); // Display off
 
 	int counter=0;
-	int half=0;
-	ILI9225_clear();
+
+	if(!ILI9225_isBusy())
+	{
+		ILI9225_drawBitmapDMA(0, 0, 176, 176, unicorn);
+	}
 
 	while (1)
 	{
-		if(displayFree)
-		{
-			for (i = 0; i<176*55; i ++)
+
+/*
+			for (i = 0; i<176*110; i ++)
 			{
 				bitmap[i] = coloursArr[counter%4];
 			}
 
-			for (i = 176*55; i<176 * 110; i ++)
+			for (i = 176*110; i<176 * 220; i ++)
 			{
 				bitmap[i] = coloursArr[counter%4 + 4];
 			}
 
 
-			ILI9225_setWindow(x1, y1, 175, 109);
-			ILI9225_initBitmapDMA(bitmap, 176,110);
-			ILI9225_startBitmapDMA();
-
-			counter++;
-
-//			if(half)
-//			{
-//				x1 = 0;
-//				y1 = 109;
-//				ILI9225_setWindow(x1, y1, 175, 110);
-//				ILI9225_initBitmapDMA(bitmap+(176*110), 176,110);
-//				ILI9225_startBitmapDMA();
-//
-//				half = 0;
-//				counter++;
-//			}
-//			else
-//			{
-//				x1 = 0;
-//				y1 = 0;
-//				ILI9225_setWindow(x1, y1, 175, 110);
-//				ILI9225_initBitmapDMA(bitmap, 176,110);
-//				ILI9225_startBitmapDMA();
-//
-//				half = 1;
-//			}
-
-
-//			ILI9225_drawBitmap(x1, y1, 176, 100, bitmap);
-
-		}
-
+			if(!ILI9225_isBusy())
+			{
+				ILI9225_drawBitmapDMA(0, 0, 176, 220, bitmap);
+				counter++;
+			}
+*/
 		Delay(1000);
 	}
 }

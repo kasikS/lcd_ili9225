@@ -28,7 +28,7 @@ void spi_DMA_Init(uint16_t *data, uint32_t bufferSize);
 void spi_DMA_Enable(void);
 
 
-extern int stopDMA;
-extern volatile int displayFree;
-//extern uint16_t bitmap[400];
+//extern int stopDMA;
+//extern volatile int displayFree;
+//extern uint16_t bitmap[LCD_WIDTH*LCD_HEIGHT];
 #endif /* SRC_SPI_H */

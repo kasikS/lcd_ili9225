@@ -11,6 +11,7 @@
 #include "delay.h"
 #include "ILI9225_registers.h"
 #include "ILI9225_colours.h"
+#include <limits.h>
 
 uint8_t  ILI9225_orientation = 0;
 uint8_t  ILI9225_maxX = 0;
@@ -211,20 +212,25 @@ void ILI9225_orientCoordinates(uint16_t *x1, uint16_t *y1)
 
 void ILI9225_setWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
-	ILI9225_orientCoordinates(&x0, &y0);
-	ILI9225_orientCoordinates(&x1, &y1);
+	uint16_t xb = x0;
+	uint16_t xe = x1;
+	uint16_t yb = y0;
+	uint16_t ye = y1;
 
-    if (x1 < x0) ILI9225_swap(&x0, &x1);
-    if (y1 < y0) ILI9225_swap(&y0, &y1);
+	ILI9225_orientCoordinates(&xb, &yb);
+	ILI9225_orientCoordinates(&xe, &ye);
 
-    ILI9225_write(HORIZONTAL_WINDOW_ADDR1, x1);
-    ILI9225_write(HORIZONTAL_WINDOW_ADDR2, x0);
+    if (x1 < x0) ILI9225_swap(&xb, &xe);
+    if (y1 < y0) ILI9225_swap(&yb, &ye);
 
-    ILI9225_write(VERTICAL_WINDOW_ADDR1, y1);
-    ILI9225_write(VERTICAL_WINDOW_ADDR2, y0);
+    ILI9225_write(HORIZONTAL_WINDOW_ADDR1, xe);
+    ILI9225_write(HORIZONTAL_WINDOW_ADDR2, xb);
 
-    ILI9225_write(RAM_ADDR_SET1, x0);
-    ILI9225_write(RAM_ADDR_SET2, y0);
+    ILI9225_write(VERTICAL_WINDOW_ADDR1, ye);
+    ILI9225_write(VERTICAL_WINDOW_ADDR2, yb);
+
+    ILI9225_write(RAM_ADDR_SET1, xb);
+    ILI9225_write(RAM_ADDR_SET2, yb);
 }
 
 
@@ -232,9 +238,12 @@ void ILI9225_drawPixel(uint16_t x1, uint16_t y1, uint16_t color)
 {
     if ((x1 >= ILI9225_maxX) || (y1 >= ILI9225_maxY)) return;
 
-    ILI9225_orientCoordinates(&x1, &y1);
-    ILI9225_write(RAM_ADDR_SET1,x1);
-    ILI9225_write(RAM_ADDR_SET2,y1);
+	uint16_t x = x1;
+	uint16_t y = y1;
+
+    ILI9225_orientCoordinates(&x, &y);
+    ILI9225_write(RAM_ADDR_SET1,x);
+    ILI9225_write(RAM_ADDR_SET2,y);
     ILI9225_write(GRAM_DATA_REG,color);
 }
 
@@ -242,10 +251,13 @@ void ILI9225_drawBitmap(uint16_t x0, uint16_t y0, uint16_t columns, uint16_t row
 {
 	int i = 0;
 	uint16_t size = rows*columns;
-    if ((x0 >= ILI9225_maxX) || (y0 >= ILI9225_maxY) || (x0+columns-1 >= ILI9225_maxX) || (y0+rows-1 >= ILI9225_maxY)   ) return;
+    if ((x0 >= ILI9225_maxX) || (y0 >= ILI9225_maxY) || (x0+columns-1 >= ILI9225_maxX) || (y0+rows-1 >= ILI9225_maxY)) return;
 
-    ILI9225_orientCoordinates(&x0, &y0);
-    ILI9225_setWindow(x0, y0, x0 + columns-1, y0 + rows-1);
+	uint16_t xb = x0;
+	uint16_t yb = y0;
+
+    ILI9225_orientCoordinates(&xb, &yb);
+    ILI9225_setWindow(xb, yb, xb + columns-1, yb + rows-1);
 
     ILI9225_writeIndex(GRAM_DATA_REG,1);
 	GPIO_WriteBit(CS_port, CS, Bit_RESET);
@@ -259,21 +271,72 @@ void ILI9225_drawBitmap(uint16_t x0, uint16_t y0, uint16_t columns, uint16_t row
 }
 
 
-void ILI9225_initBitmapDMA(uint16_t *data, uint16_t columns, uint16_t rows)
+void ILI9225_initBitmapDMA(uint16_t x0, uint16_t y0, uint16_t columns, uint16_t rows, uint16_t *data)
 {
-	uint16_t size =rows*columns*2;
-	ILI9225_setWindow(0, 0, columns-1, rows-1);
+    if ((x0 >= ILI9225_maxX) || (y0 >= ILI9225_maxY) || (x0+columns-1 >= ILI9225_maxX) || (y0+rows-1 >= ILI9225_maxY)) return;
+
+	uint16_t xb = x0;
+	uint16_t yb = y0;
+
+	uint32_t size = rows*columns*2;
+	ILI9225_setWindow(xb, yb, xb + columns-1, yb + rows-1);
 
 	spi_DMA_Init(data, size);
 	spi_DMA_irqInit();
 	spi_DMA_irqEnable();
 }
 
-void ILI9225_reconfBitmapDMA(uint16_t *data, uint16_t columns, uint16_t rows)
+static uint16_t * dma_address=0;
+static uint32_t dma_size=0;
+
+static int busy=0;
+
+
+void ILI9225_drawBitmapDMA(uint16_t x0, uint16_t y0, uint16_t columns, uint16_t rows, uint16_t *data)
 {
-	uint16_t size = rows*columns*2;
-	ILI9225_setWindow(0, 0, columns-1, rows-1);
+    if ((x0 >= ILI9225_maxX) || (y0 >= ILI9225_maxY) || (x0+columns-1 >= ILI9225_maxX) || (y0+rows-1 >= ILI9225_maxY)) return;
+
+    busy = 1;
+
+	uint32_t size = rows*columns*2;
+	ILI9225_setWindow(x0, y0, x0 + columns-1, y0 + rows-1);
+
+	if(size > 65535) //this DMA can fit max 65535 items - thus send in chunks if needed
+	{
+		dma_size = size - 65535;
+		dma_address = data + (65535/2);
+		size = 65535;
+	}
+	else
+	{
+		dma_size = 0;
+	}
+
 	spi_DMA_Init(data, size);
+	spi_DMA_irqInit();
+	spi_DMA_irqEnable();
+
+	ILI9225_startBitmapDMA();
+}
+
+void ILI9225_irqHandler(void)
+{
+	if(!dma_size)
+	{
+		busy = 0;
+		return;
+	}
+	spi_DMA_Init(dma_address, dma_size);
+	dma_size = 0;
+	spi_DMA_irqInit();
+	spi_DMA_irqEnable();
+
+	ILI9225_startBitmapDMA();
+}
+
+int ILI9225_isBusy(void)
+{
+	return busy;
 }
 
 void ILI9225_startBitmapDMA(void)
@@ -290,12 +353,16 @@ void ILI9225_clear(void)
 {
 	uint16_t size = LCD_WIDTH*LCD_HEIGHT;
 	int i = 0;
-	uint16_t buff[size];
 
-	for (i = 0; i < size; i++)
-	{
-		buff[i] = COLOR_SNOW;
-	}
+    ILI9225_setWindow(0, 0, LCD_WIDTH-1, LCD_HEIGHT-1);
 
-	ILI9225_drawBitmap(0,0,LCD_WIDTH,LCD_HEIGHT, buff);
+    ILI9225_writeIndex(GRAM_DATA_REG,1);
+	GPIO_WriteBit(CS_port, CS, Bit_RESET);
+
+    for(i=0; i< size; i++)
+    {
+    	ILI9225_writeRegister(COLOR_SNOW,0);
+
+    }
+	GPIO_WriteBit(CS_port, CS, Bit_SET);
 }

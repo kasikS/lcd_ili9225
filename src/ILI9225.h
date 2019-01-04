@@ -24,9 +24,11 @@ void ILI9225_setWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
 void ILI9225_drawPixel(uint16_t x1, uint16_t y1, uint16_t color);
 void ILI9225_drawBitmap(uint16_t x0, uint16_t y0, uint16_t columns, uint16_t rows, uint16_t *data);
 
-void ILI9225_initBitmapDMA(uint16_t *data, uint16_t columns, uint16_t rows);
+void ILI9225_initBitmapDMA(uint16_t x0, uint16_t y0, uint16_t columns, uint16_t rows, uint16_t *data);
 void ILI9225_startBitmapDMA(void);
-void ILI9225_reconfBitmapDMA(uint16_t *data, uint16_t columns, uint16_t rows);
 
+void ILI9225_drawBitmapDMA(uint16_t x0, uint16_t y0, uint16_t columns, uint16_t rows, uint16_t *data);
+void ILI9225_irqHandler(void);
+int ILI9225_isBusy(void);
 
 #endif /* SRC_ILI9225_H_ */

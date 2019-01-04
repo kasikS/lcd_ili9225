@@ -11,6 +11,7 @@
 #include "spi.h"
 #include "stm32f4xx_spi.h"
 #include "serial.h"
+#include "ILI9225.h"
 
 
 void spi_init(void)
@@ -91,8 +92,8 @@ void spi_DMA_Init(uint16_t *data, uint32_t bufferSize)
 	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable; //automatic memory increment disable for peripheral
 	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;	//automatic memory increment enable for memory
 	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;	//source peripheral data size = 8bit
-	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;	//destination memory data size = 8bit
-	DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
+	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Word;	//destination memory data size = 8bit
+	DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Enable;
 	DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
 	DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
 	DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
@@ -119,6 +120,8 @@ void spi_DMA_irqDisable(void)
 {
 	DMA_ITConfig(DMA1_Stream4, DMA_IT_TC, DISABLE);
 }
+
+volatile int displayFree;
 
 void spi_DMA_Enable(void)
 {
@@ -277,4 +280,7 @@ void DMA1_Stream4_IRQHandler(void)
 		while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == SET);
 
 		spi_DMA_Disable();
+
+		ILI9225_irqHandler();
+
 }
